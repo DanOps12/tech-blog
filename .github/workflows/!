@@ -81,6 +81,17 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./public
+          name: Configure AWS Credentials 
+          uses: aws-actions/configure-aws-credentials@v1
+          with:
+          role-to-assume: arn:aws:iam::183295450340:role/OIDC_tech-blog
+          aws-region: eu-west-1
+          name: Deploy to S3
+          run: |
+          aws s3 sync public/ s3://danieltechblog --delete
+        - name: Invalidate Cloudfront cache
+        run: |
+        aws cloudfront create-invalidation --distribution-id E3VDNMX3197LA7 --paths "/*"
 
   # Deployment job
   deploy:
