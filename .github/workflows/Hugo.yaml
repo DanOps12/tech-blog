@@ -75,8 +75,8 @@ jobs:
 
       - name: Create Cloudfront Invalidation
         run: | 
-            aws cloudfront create-invalidation  \ 
-            --distribution-id ${{ vars.DISTRIVUTION_ID }}  \
+            aws cloudfront create-invalidation  
+            --distribution-id ${{ vars.DISTRIVUTION_ID }} 
             --paths "/*"
 
   # Deployment job
