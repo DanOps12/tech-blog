@@ -67,7 +67,7 @@ jobs:
         with: 
              audience: sts.amazonaws.com
              role-to-assume: ${{ secrets.ROLE }}
-             aws-region: ${{ secrets.REGION }}
+             aws-region: "eu-west-1"
 
       - name: S3 sync
         run: |
