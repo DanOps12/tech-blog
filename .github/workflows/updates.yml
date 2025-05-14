@@ -1,24 +1,70 @@
-name: Sync to S3
+name: Blog updates
 
 on:
   push:
-    branches:
-      - main
+        branches:
+        - main
 
-jobs:
-  sync-to-s3:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+env:
+  AWS_REGION : "eu-west-1"
 
-      - name: Sync folder to S3
-        uses: jakejarvis/s3-sync-action@master
+jobs: 
+
+build_job : 
+
+name: Build
+runs_on: ubuntun-latest
+  steps: 
+  - name: Checkout Repository
+    uses: action/checkout@v4
+    
+  - name: Setup hugo
+    uses: peaceiris/actions-hugo@v3
+    with: 
+     hugo-version: "latest" 
+     extented: true
+
+  - name: Build
+    run: hugo
+
+  - name: Upload Artifact
+    uses: actions/upload-artifact@v4
+    with:
+     name: tech-blog
+     path: public/*
+
+
+deploy_job:
+      name: Publish
+      needs: [build_job]
+      runs_on: ubuntun latest
+      permissions:
+        id-token: write
+        contents: read
+
+
+  steps: 
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with: 
+          name: tech-blog
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          args: --acl public-read --follow-symlinks --delete
-        env:
-          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: 'eu-west-1'          
-          SOURCE_DIR: 'public/'              
-          
+         role-to-assume: ${{ secrets.Role }}
+         aws-region: ${{ env.AWS_REGION }}
+
+       - name: S3 sync
+         run: |
+         aws s3 sync . s3://${{ secrets.BUCKET_NAME }} \ --delete
+
+        - name: Create Cloudfront Invalidation
+          run: | 
+            aws cloud create-invalidation  \ 
+            --distribution-id ${{ vars.DISTRIVUTION_ID }}  \
+            --paths "/*"
+       
+
+        
