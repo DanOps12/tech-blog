@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
   id-token: write
 
 concurrency:
@@ -62,6 +61,23 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./public
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with: 
+             audience: sts.amazonaws.com
+             role-to-assume: ${{ secrets.ROLE }}
+             aws-region: ${{ secrets.REGION }}
+
+      - name: S3 sync
+        run: |
+         aws s3 sync ./public/ s3://${{ secrets.BUCKET_NAME }} \ --delete
+
+      - name: Create Cloudfront Invalidation
+        run: | 
+            aws cloud create-invalidation  \ 
+            --distribution-id ${{ vars.DISTRIVUTION_ID }}  \
+            --paths "/*"
 
   # Deployment job
   deploy:
