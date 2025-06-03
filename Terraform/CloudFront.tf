@@ -1,56 +1,25 @@
-resource "aws_s3_bucket" "blog_bucket" {
-  bucket = var.bucket_name
-  tags = {
-    Name = "blog-bucket"
-  }
+resource "aws_cloudfront_origin_access_control" "s3_oac" {
+  name                              = "CloudFrontS3OAC"
+  origin_access_control_origin_type  = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
 }
-
-resource "aws_s3_bucket_public_access_block" "blog_bucket_public" {
-  bucket                  = aws_s3_bucket.blog_bucket.id
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
-
-resource "aws_s3_bucket_website_configuration" "website" {
-  bucket = aws_s3_bucket.blog_bucket.id
-
-  index_document {
-    suffix = "index.html"
-  }
-  error_document {
-    key = "error.html"
-  }
-}
-
-resource "aws_s3_bucket_policy" "blog_policy" {
-  bucket = aws_s3_bucket.blog_bucket.id
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect    = "Allow",
-      Principal = "*",
-      Action    = "s3:GetObject",
-      Resource  = "${aws_s3_bucket.blog_bucket.arn}/*"
-    }]
-  })
-}
-
-resource "aws_cloudfront_distribution" "blog_cdn" {
-  origin {
-    domain_name = aws_s3_bucket.blog_bucket.bucket_regional_domain_name
-    origin_id   = "s3-blog-origin"
-  }
-
+resource "aws_cloudfront_distribution" "cdn" {
   enabled             = true
   default_root_object = "index.html"
 
+  origin {
+    domain_name              = https://d3ra79i8fg796m.cloudfront.net
+    origin_id                = danieltechblog.s3-website-eu-west-1.amazonaws.com
+    origin_access_control_id = aws_cloudfront_origin_access_control.s3_oac.id
+  }
+
   default_cache_behavior {
-    allowed_methods  = ["GET", "HEAD"]
-    cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "s3-blog-origin"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = aws_s3_bucket.website.id
     viewer_protocol_policy = "redirect-to-https"
+
     forwarded_values {
       query_string = false
       cookies {
@@ -59,7 +28,7 @@ resource "aws_cloudfront_distribution" "blog_cdn" {
     }
   }
 
-  price_class = "PriceClass_100"
+  price_class = var.cf_price_class
 
   restrictions {
     geo_restriction {
@@ -70,4 +39,37 @@ resource "aws_cloudfront_distribution" "blog_cdn" {
   viewer_certificate {
     cloudfront_default_certificate = true
   }
+}
+data "aws_iam_policy_document" "cf_access" {
+  statement {
+    actions = ["s3:GetObject"]
+    resources = ["${arn:aws:s3:::danieltechblog}/*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [arn:aws:cloudfront::183295450340:distribution/E3VDNMX3197LA7]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "website_policy" {
+  bucket = danieltechblog.s3-website-eu-west-1.amazonaws.com
+  policy = {
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicReadGetObject",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::danieltechblog/*"
+        }
+    ]
+}
 }
